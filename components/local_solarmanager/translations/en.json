@@ -1,0 +1,85 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Device is already configured"
+        },
+        "error": {
+            "cannot_connect": "Failed to connect",
+            "unknown": "Unexpected error"
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "api_key": "API key",
+                    "host": "Host"
+                },
+                "data_description": {
+                    "api_key": "The API key configured in your Solar Manager's local API settings. Leave empty if no API key is set.",
+                    "host": "The hostname or IP address of your Solar Manager on your local network."
+                },
+                "description": "Set up your local Solar Manager to integrate with Home Assistant.\n\nThe local API must be enabled in the Solar Manager web platform under Settings > Local API."
+            }
+        }
+    },
+    "entity": {
+        "sensor": {
+            "battery_charging_energy": {
+                "name": "Battery charging energy"
+            },
+            "battery_charging_power": {
+                "name": "Battery charging power"
+            },
+            "battery_discharging_energy": {
+                "name": "Battery discharging energy"
+            },
+            "battery_discharging_power": {
+                "name": "Battery discharging power"
+            },
+            "consumption_energy": {
+                "name": "Consumption energy"
+            },
+            "consumption_power": {
+                "name": "Consumption power"
+            },
+            "device_active": {
+                "name": "Active device"
+            },
+            "device_heating_adjustment": {
+                "name": "Heating adjustment"
+            },
+            "device_imported_energy": {
+                "name": "Imported energy"
+            },
+            "device_operation_state": {
+                "name": "Operation state"
+            },
+            "device_power": {
+                "name": "Power"
+            },
+            "device_soc": {
+                "name": "Battery"
+            },
+            "device_temperature": {
+                "name": "Temperature"
+            },
+            "direct_pv_consumption_energy": {
+                "name": "Direct PV consumption energy"
+            },
+            "grid_export_energy": {
+                "name": "Grid export energy"
+            },
+            "grid_import_energy": {
+                "name": "Grid import energy"
+            },
+            "production_energy": {
+                "name": "Production energy"
+            },
+            "production_power": {
+                "name": "Production power"
+            },
+            "self_consumption_energy": {
+                "name": "Self-consumption energy"
+            }
+        }
+    }
+}

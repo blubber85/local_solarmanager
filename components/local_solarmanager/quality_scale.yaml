@@ -1,0 +1,84 @@
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: This integration has no service actions.
+  appropriate-polling:
+    status: done
+    comment: Polls the local API every 15 seconds, appropriate for a local energy device.
+  brands:
+    status: exempt
+    comment: Solar Manager AG does not have a separate brand entry; the integration covers the single product.
+  common-modules: done
+  config-flow-test-coverage: done
+  config-flow: done
+  dependency-transparency:
+    status: done
+    comment: Uses aiohttp, which is bundled with Home Assistant.
+  docs-actions:
+    status: exempt
+    comment: This integration has no service actions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  entity-event-setup:
+    status: exempt
+    comment: Entities use the DataUpdateCoordinator pattern, not event subscriptions.
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  # Silver
+  config-entry-unloading: done
+  log-when-unavailable: todo
+  entity-unavailable: done
+  action-exceptions:
+    status: exempt
+    comment: This integration has no service actions.
+  reauthentication-flow: todo
+  parallel-updates: done
+  test-coverage: done
+  integration-owner: todo
+  docs-installation-parameters: todo
+  docs-configuration-parameters:
+    status: exempt
+    comment: This integration has no options flow.
+
+  # Gold
+  entity-translations: done
+  entity-device-class: done
+  devices: done
+  entity-category: todo
+  entity-disabled-by-default: todo
+  discovery:
+    status: exempt
+    comment: Local Solar Manager devices do not support network discovery.
+  stale-devices: todo
+  diagnostics: todo
+  exception-translations: todo
+  icon-translations: todo
+  reconfiguration-flow: todo
+  dynamic-devices:
+    status: exempt
+    comment: Devices connected to the Solar Manager are not exposed as HA devices.
+  discovery-update-info:
+    status: exempt
+    comment: Discovery is not supported.
+  repair-issues: todo
+  docs-use-cases: todo
+  docs-supported-devices: todo
+  docs-supported-functions: todo
+  docs-troubleshooting: todo
+  docs-data-update: todo
+  docs-known-limitations: todo
+  docs-examples: todo
+
+  # Platinum
+  async-dependency:
+    status: exempt
+    comment: No external library is used.
+  inject-websession: todo
+  strict-typing: todo

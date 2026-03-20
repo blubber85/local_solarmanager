@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-from datetime import timedelta
+import json
 
 import aiohttp
 
@@ -15,6 +15,9 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import CONF_API_KEY, DOMAIN, LOGGER
+
+_WS_RECONNECT_DELAY_INITIAL = 5
+_WS_RECONNECT_DELAY_MAX = 60
 
 
 @dataclass(kw_only=True)
@@ -66,7 +69,7 @@ type LocalSolarManagerConfigEntry = ConfigEntry[LocalSolarManagerCoordinator]
 
 
 class LocalSolarManagerCoordinator(DataUpdateCoordinator[LocalSolarManagerData]):
-    """Coordinator to manage fetching Local Solar Manager data."""
+    """Coordinator to manage Local Solar Manager data via WebSocket push."""
 
     config_entry: LocalSolarManagerConfigEntry
 
@@ -81,18 +84,26 @@ class LocalSolarManagerCoordinator(DataUpdateCoordinator[LocalSolarManagerData])
             LOGGER,
             config_entry=entry,
             name=DOMAIN,
-            update_interval=timedelta(seconds=15),
         )
         self._host = entry.data[CONF_HOST]
         self._api_key: str | None = entry.data.get(CONF_API_KEY) or None
         self._session = async_get_clientsession(hass, verify_ssl=False)
+        self._devices_metadata: dict[str, dict] = {}
 
-    async def _async_update_data(self) -> LocalSolarManagerData:
-        """Fetch data from the Local Solar Manager API."""
+    def _build_headers(self) -> dict[str, str]:
+        """Build HTTP/WS headers including optional API key."""
         headers: dict[str, str] = {}
         if self._api_key:
             headers["X-API-Key"] = self._api_key
+        return headers
 
+    async def _async_update_data(self) -> LocalSolarManagerData:
+        """Fetch initial data from HTTP endpoints.
+
+        Called once during setup via async_config_entry_first_refresh.
+        Subsequent updates arrive via the WebSocket listener.
+        """
+        headers = self._build_headers()
         url_point = f"http://{self._host}/v2/point"
         url_devices = f"http://{self._host}/v2/devices"
 
@@ -113,18 +124,19 @@ class LocalSolarManagerCoordinator(DataUpdateCoordinator[LocalSolarManagerData])
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error communicating with {self._host}: {err}") from err
 
-        # Build a lookup from /v2/devices: deviceId → metadata dict
-        devices_metadata: dict[str, dict] = {
+        self._devices_metadata = {
             d["deviceId"]: d for d in devices_data if "deviceId" in d
         }
+        return self._parse_point_data(point_data)
 
-        # Iterate over the runtime device list in /v2/point and enrich with metadata
+    def _parse_point_data(self, point_data: dict) -> LocalSolarManagerData:
+        """Parse a /v2/point-style payload and merge with cached device metadata."""
         devices = [
             LocalSolarManagerDeviceData(
                 device_id=d["_id"],
-                name=devices_metadata.get(d["_id"], {}).get("name"),
-                device_type=devices_metadata.get(d["_id"], {}).get("type"),
-                description=devices_metadata.get(d["_id"], {}).get("description"),
+                name=self._devices_metadata.get(d["_id"], {}).get("name"),
+                device_type=self._devices_metadata.get(d["_id"], {}).get("type"),
+                description=self._devices_metadata.get(d["_id"], {}).get("description"),
                 signal=d.get("signal", ""),
                 power=d.get("power", 0.0),
                 soc=d.get("soc"),
@@ -155,3 +167,57 @@ class LocalSolarManagerCoordinator(DataUpdateCoordinator[LocalSolarManagerData])
             grid_export_energy=point_data.get("eWh", 0),
             devices=devices,
         )
+
+    async def async_listen_websocket(self) -> None:
+        """Connect to /v2/stream and push updates; reconnect on failure.
+
+        Intended to be run as a background task via
+        entry.async_create_background_task so it is automatically cancelled
+        when the config entry is unloaded.
+        """
+        url = f"ws://{self._host}/v2/stream"
+        headers = self._build_headers()
+        retry_delay = _WS_RECONNECT_DELAY_INITIAL
+
+        while True:
+            try:
+                async with self._session.ws_connect(
+                    url, headers=headers, ssl=False
+                ) as ws:
+                    LOGGER.debug("WebSocket connected to %s", self._host)
+                    retry_delay = _WS_RECONNECT_DELAY_INITIAL
+                    async for msg in ws:
+                        if msg.type == aiohttp.WSMsgType.TEXT:
+                            try:
+                                point_data = json.loads(msg.data)
+                            except json.JSONDecodeError as err:
+                                LOGGER.warning(
+                                    "Ignoring malformed WebSocket message: %s", err
+                                )
+                                continue
+                            LOGGER.info(f"data: {point_data}")
+                            self.async_set_updated_data(
+                                self._parse_point_data(point_data)
+                            )
+                        elif msg.type in (
+                            aiohttp.WSMsgType.CLOSED,
+                            aiohttp.WSMsgType.ERROR,
+                        ):
+                            LOGGER.debug(
+                                "WebSocket closed/error from %s, reconnecting",
+                                self._host,
+                            )
+                            break
+            except aiohttp.ClientError as err:
+                LOGGER.warning(
+                    "WebSocket error for %s: %s. Retrying in %d s.",
+                    self._host,
+                    err,
+                    retry_delay,
+                )
+            except asyncio.CancelledError:
+                LOGGER.debug("WebSocket listener for %s cancelled", self._host)
+                raise
+
+            await asyncio.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, _WS_RECONNECT_DELAY_MAX)

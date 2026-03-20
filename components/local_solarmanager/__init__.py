@@ -20,6 +20,13 @@ async def async_setup_entry(
     entry.runtime_data = coordinator
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    entry.async_create_background_task(
+        hass,
+        coordinator.async_listen_websocket(),
+        name="local_solarmanager_websocket",
+    )
+
     return True
 
 
